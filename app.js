@@ -364,7 +364,7 @@ window.handleAddWorkstation = async function() {
     }
 }
 
-// 5. 管理者新增超連結下載項目
+// 5. 管理者新增超連結下載項目（支援 AnyDesk 專屬圖標與顏色）
 window.handleLinkUpload = async function() {
     if (!checkIsAdmin()) {
         showModal('權限不足', '您目前為一般同仁身份，無權新增下載項目。');
@@ -385,12 +385,22 @@ window.handleLinkUpload = async function() {
     const now = new Date();
     const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
     
+    // 自動判斷品牌圖標與官方代表色
     let iconClass = 'fa-file-arrow-down text-corporate-600';
     const val = nameInput.value.trim().toLowerCase();
-    if (val.includes('line')) iconClass = 'fa-brands fa-line text-emerald-600';
-    else if (val.endsWith('.xml')) iconClass = 'fa-file-code text-indigo-600';
-    else if (val.endsWith('.bat')) iconClass = 'fa-file-lines text-amber-600';
-    else if (val.includes('excel') || val.includes('xlsx')) iconClass = 'fa-file-excel text-emerald-600';
+    if (val.includes('line')) {
+        iconClass = 'fa-brands fa-line text-emerald-600';
+    } else if (val.includes('wechat') || val.includes('微信')) {
+        iconClass = 'fa-brands fa-weixin text-teal-600';
+    } else if (val.includes('anydesk')) {
+        iconClass = 'fa-solid fa-desktop text-rose-600'; // AnyDesk 官方代表紅
+    } else if (val.endsWith('.xml')) {
+        iconClass = 'fa-file-code text-indigo-600';
+    } else if (val.endsWith('.bat')) {
+        iconClass = 'fa-file-lines text-amber-600';
+    } else if (val.includes('excel') || val.includes('xlsx')) {
+        iconClass = 'fa-file-excel text-emerald-600';
+    }
 
     try {
         await addDoc(collection(db, "sharedFiles"), {
