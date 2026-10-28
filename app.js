@@ -22,7 +22,6 @@ let globalFilesMap = {};
 // ==========================================
 // 🔐 權限控制設定：預設當前使用者帳號
 // ==========================================
-// 如果你想模擬一般同仁，可改為 "User"；若為管理者請保持 "Lyon"
 let currentUser = "Lyon"; 
 
 // 檢查是否為管理者的函式
@@ -30,11 +29,22 @@ function checkIsAdmin() {
     return currentUser.toLowerCase() === "lyon";
 }
 
-// 提供網頁端隨時切換身份測試的函式 (例如在主控台輸入 switchUser('User'))
-window.switchUserRole = function(username) {
-    currentUser = username;
+// 點擊右上角隨時切換身份測試的互動函式
+window.toggleUserRole = function() {
+    if (currentUser.toLowerCase() === "lyon") {
+        currentUser = "User";
+        document.getElementById('userNameDisplay').innerText = "同仁 - User";
+        document.getElementById('userRoleDisplay').innerText = "一般員工";
+        document.getElementById('userAvatarIcon').innerText = "US";
+        showModal('身份切換成功', '目前已切換為【一般同仁】身份（管理員上傳與發布區塊已自動隱藏）。');
+    } else {
+        currentUser = "Lyon";
+        document.getElementById('userNameDisplay').innerText = "IT -Lyon";
+        document.getElementById('userRoleDisplay').innerText = "資訊部-系統管理員";
+        document.getElementById('userAvatarIcon').innerText = "IT";
+        showModal('身份切換成功', '目前已切換為【系統管理員 (Lyon)】身份（已解鎖所有管理權限）。');
+    }
     applyRolePermissions();
-    showModal('身份切換成功', `目前已切換身份為：${username} (${checkIsAdmin() ? '系統管理者' : '一般同仁'})`);
 }
 
 // 根據權限動態隱藏/顯示管理者專區介面
@@ -461,5 +471,5 @@ window.onload = function() {
     listenBroadcasts();
     listenFiles();
     listenWorkstations();
-    applyRolePermissions(); // 套用權限：若非 Lyon 則隱藏管理者操作區
+    applyRolePermissions(); // 套用權限：預設以 Lyon 身分載入
 };
