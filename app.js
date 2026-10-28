@@ -16,7 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 全域儲存目前的檔案清單，供下載使用
+// 全域儲存檔案與遠端主機對應表
 let globalFilesMap = {};
 
 // Tab Switching Logic
@@ -118,24 +118,23 @@ function listenBroadcasts() {
     });
 }
 
-// 2. 即時監聽 Firestore 的共用檔案清單（安全對應表下載法）
+// 2. 即時監聽 Firestore 的共用檔案清單
 function listenFiles() {
     const q = query(collection(db, "sharedFiles"), orderBy("timestamp", "desc"));
     onSnapshot(q, (snapshot) => {
         let sharedFiles = [];
-        globalFilesMap = {}; // 清空並重新對應
+        globalFilesMap = {};
 
         snapshot.forEach((doc) => {
             const data = doc.data();
-            const fileId = doc.id;
-            globalFilesMap[fileId] = data; // 存入記憶體中，避免 HTML 傳遞過長字串出錯
-            sharedFiles.push({ id: fileId, ...data });
+            globalFilesMap[doc.id] = data;
+            sharedFiles.push({ id: doc.id, ...data });
         });
 
         if (sharedFiles.length === 0) {
             globalFilesMap["default_xml"] = {
                 name: "topdgi.xml",
-                fileData: "data:text/xml;base64,PD94bWwgdmVyc2lvbj0nMS4wJz8+PHNldHRpbmdzPjwvY29uZmlnPjwvc2V0dGluZ3M+"
+                fileData: "data:text/xml;base64,PD94bWwgdmVyc2lvbj0nMS4wJz8+PHNldHRpbmdzPjwvY29uZmlnPjwvc2V0dGluZ3M="
             };
             sharedFiles.push({
                 id: "default_xml",
@@ -174,18 +173,93 @@ function listenFiles() {
     });
 }
 
-// 3. 管理者上傳檔案到 Firestore 雲端
+// 3. 即時監聽 Firestore 的遠端桌面主機清單
+function listenWorkstations() {
+    const q = query(collection(db, "workstations"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (snapshot) => {
+        let stations = [];
+        snapshot.forEach((doc) => {
+            stations.push(doc.data());
+        });
+
+        // 如果資料庫是空的，給予預設的主機
+        if (stations.length === 0) {
+            stations.push(
+                { name: "RD-Gateway-01 (財務專用)", idCode: "RDP-01", spec: "8 vCPU / 32GB RAM / Windows Server 2022", ip: "192.168.10.50", status: "運行中", statusColor: "emerald" },
+                { name: "RD-Gateway-02 (研發測試)", idCode: "RDP-02", spec: "16 vCPU / 64GB RAM / Ubuntu 22.04 LTS", ip: "192.168.10.51", status: "運行中", statusColor: "emerald" },
+                { name: "RD-Gateway-03 (公用行政)", idCode: "RDP-03", spec: "4 vCPU / 16GB RAM / Windows 11 Enterprise", ip: "192.168.10.52", status: "維護中", statusColor: "amber" }
+            );
+        }
+
+        const grid = document.getElementById('workstationGrid');
+        if (grid) {
+            grid.innerHTML = stations.map(s => `
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 bg-${s.statusColor || 'emerald'}-50 text-${s.statusColor || 'emerald'}-700 rounded-full text-xs font-semibold flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-${s.statusColor || 'emerald'}-500"></span> ${s.status || '運行中'}
+                            </span>
+                            <span class="text-xs text-slate-400 font-mono">ID: ${s.idCode || 'RDP-X'}</span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-base">${s.name}</h3>
+                        <p class="text-xs text-slate-500 mt-1">配置：${s.spec}</p>
+                        <div class="mt-4 p-3 bg-slate-50 rounded-xl font-mono text-xs text-slate-600 space-y-1 border border-slate-100">
+                            <div>IP 位址: <span class="text-slate-900 font-semibold">${s.ip}</span></div>
+                            <div>連接埠: <span class="text-slate-900 font-semibold">3389</span></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                        <button onclick="openWebRdp('${s.name}', '${s.ip}')" class="py-2 px-3 bg-corporate-600 hover:bg-corporate-700 text-white rounded-xl text-xs font-medium transition text-center shadow-sm">
+                            <i class="fa-solid fa-globe mr-1"></i> 網頁直接連線
+                        </button>
+                        <button onclick="downloadRdpFile('${s.name}', '${s.ip}')" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition text-center border border-slate-200">
+                            <i class="fa-solid fa-file-arrow-down mr-1"></i> 下載.rdp檔
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+    });
+}
+
+// 4. 管理者動態新增遠端桌面主機到 Firestore 雲端
+window.handleAddWorkstation = async function() {
+    const name = prompt("請輸入遠端主機名稱與部門（例如：RD-Gateway-04 (品管專用)）：");
+    if (!name) return;
+    const ip = prompt("請輸入主機 IP 位址（例如：192.168.10.53）：");
+    if (!ip) return;
+    const spec = prompt("請輸入主機硬體與系統規格：", "4 vCPU / 16GB RAM / Windows 11");
+
+    try {
+        await addDoc(collection(db, "workstations"), {
+            name: name,
+            idCode: "RDP-" + Math.floor(Math.random() * 900 + 100),
+            spec: spec,
+            ip: ip,
+            status: "運行中",
+            statusColor: "emerald",
+            timestamp: serverTimestamp()
+        });
+
+        showModal('新增成功', `已成功將主機「${name} (${ip})」新增至雲端，全體同仁畫面已即時同步！`);
+    } catch (err) {
+        console.error("新增主機失敗: ", err);
+        showModal('新增失敗', '無法寫入雲端資料庫。');
+    }
+}
+
+// 5. 管理者上傳檔案
 window.handleAdminUpload = async function() {
     const fileInput = document.getElementById('adminUploadFile');
     const categorySelect = document.getElementById('adminFileCategory');
 
     if (!fileInput.files || fileInput.files.length === 0) {
-        showModal('尚未選擇檔案', '請先點擊選擇您要上傳的安裝檔或表格。');
+        showModal('尚未選擇檔案', '請先點擊選擇您要上傳的檔案。');
         return;
     }
 
     const file = fileInput.files[0];
-    
     if (file.size > 1024 * 1024) {
         showModal('檔案過大', '此上傳通道專為 1MB 以下的輕量檔案設計。');
         return;
@@ -193,7 +267,7 @@ window.handleAdminUpload = async function() {
 
     const reader = new FileReader();
     reader.onload = async function(e) {
-        const base64String = e.target.result; 
+        const base64String = e.target.result;
         const now = new Date();
         const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
         
@@ -218,13 +292,13 @@ window.handleAdminUpload = async function() {
             showModal('雲端上傳成功', `已成功將「${file.name}」上傳至 Firebase 雲端資料庫！`);
         } catch (err) {
             console.error("檔案上傳失敗: ", err);
-            showModal('上傳失敗', '無法寫入雲端資料庫，請檢查網路連線。');
+            showModal('上傳失敗', '無法寫入雲端資料庫。');
         }
     };
     reader.readAsDataURL(file);
 }
 
-// 4. 透過 ID 安全觸發下載
+// 6. 下載檔案
 window.downloadCloudFile = function(fileId) {
     const fileRecord = globalFilesMap[fileId];
     if (!fileRecord || !fileRecord.fileData) {
@@ -262,7 +336,7 @@ window.downloadCloudFile = function(fileId) {
     }
 }
 
-// 寫入廣播至 Firestore 雲端資料庫
+// 發布廣播
 window.sendBroadcastMessage = async function() {
     const titleInput = document.getElementById('broadcastTitleInput');
     const targetSelect = document.getElementById('broadcastTargetSelect');
@@ -292,10 +366,10 @@ window.sendBroadcastMessage = async function() {
         titleInput.value = '';
         contentInput.value = '';
 
-        showModal('雲端廣播發布成功', `已成功將通知推送到 Firebase 雲端資料庫，全體同仁畫面將即時同步！`);
+        showModal('雲端廣播發布成功', `已成功將通知推送到 Firebase 雲端資料庫！`);
     } catch (e) {
         console.error("發布失敗: ", e);
-        showModal('發布失敗', '無法寫入雲端資料庫，請檢查網路連線或 Firebase 權限。');
+        showModal('發布失敗', '無法寫入雲端資料庫。');
     }
 }
 
@@ -316,7 +390,7 @@ window.downloadRdpFile = function(name, ip) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showModal('RDP 檔案下載成功', `已自動為您產生遠端桌面連線設定檔 [${name}.rdp]。請直接點擊兩下開啟並輸入您的網域密碼進行登入。`);
+    showModal('RDP 檔案下載成功', `已自動為您產生遠端桌面連線設定檔 [${name}.rdp]。`);
 }
 
 window.triggerRdpConnect = function(name, ip) {
@@ -324,11 +398,12 @@ window.triggerRdpConnect = function(name, ip) {
 }
 
 window.triggerFileDownload = function(fileName, category) {
-    showModal('安全下載通知', `您正在下載：「${fileName}」\n分類：${category}\n\n系統已自動通過憑證驗證並開始下載檔案。`);
+    showModal('安全下載通知', `您正在下載：「${fileName}」\n分類：${category}`);
 }
 
-// 網頁載入完成後啟動監聽
+// 網頁載入完成後啟動所有監聽
 window.onload = function() {
     listenBroadcasts();
     listenFiles();
+    listenWorkstations();
 };
