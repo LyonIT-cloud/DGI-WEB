@@ -47,7 +47,6 @@ window.toggleUserRole = function() {
             showModal('驗證失敗', '帳號錯誤！您無法獲得管理員權限。');
         }
     } else {
-        // 如果目前是 Lyon，點擊則登出切換回一般同仁
         currentUser = "User";
         document.getElementById('userNameDisplay').innerText = "同仁 - User";
         document.getElementById('userRoleDisplay').innerText = "一般員工";
@@ -133,7 +132,7 @@ function listenBroadcasts() {
         } else if (newestDocId && newestDocId !== lastBroadcastId) {
             lastBroadcastId = newestDocId;
             
-            const targetDept = newestData.target || '全體同仁';
+            const targetDept = newestData.target || '所有部門';
             const alertTitle = `[新廣播通知] ${newestData.title}`;
             const alertBody = `發布對象：${targetDept}\n等級：${newestData.level.toUpperCase()}\n\n${newestData.content}`;
             
@@ -143,7 +142,7 @@ function listenBroadcasts() {
         if (broadcasts.length === 0) {
             broadcasts.push({
                 title: "[系統就緒] 雲端廣播中心已啟動",
-                target: "全體同仁",
+                target: "所有部門",
                 level: "info",
                 content: "即日起廣播通知已串接 Firebase 雲端資料庫，將即時同步至全體同仁。",
                 time: "剛剛",
@@ -201,37 +200,45 @@ function listenBroadcasts() {
     });
 }
 
-// 2. 即時監聽 Firestore 的共用檔案清單
+// 2. 即時監聽 Firestore 的共用檔案清單（自動分流至職員與產線專區）
 function listenFiles() {
     const q = query(collection(db, "sharedFiles"), orderBy("timestamp", "desc"));
     onSnapshot(q, (snapshot) => {
-        let sharedFiles = [];
+        let staffFiles = [];
+        let lineFiles = [];
         globalFilesMap = {};
 
         snapshot.forEach((doc) => {
             const data = doc.data();
             globalFilesMap[doc.id] = data;
-            sharedFiles.push({ id: doc.id, ...data });
+            
+            // 依照分類放入對應陣列
+            if (data.category === "產線電腦需安裝檔案") {
+                lineFiles.push({ id: doc.id, ...data });
+            } else {
+                staffFiles.push({ id: doc.id, ...data }); // 預設歸類在職員電腦
+            }
         });
 
-        if (sharedFiles.length === 0) {
+        if (staffFiles.length === 0 && lineFiles.length === 0) {
             globalFilesMap["default_xml"] = {
                 name: "topdgi.xml",
                 fileData: "data:text/xml;base64,PD94bWwgdmVyc2lvbj0nMSw0Jz8+PHNldHRpbmdzPjwvY29uZmlnPjwvc2V0dGluZ3M="
             };
-            sharedFiles.push({
+            staffFiles.push({
                 id: "default_xml",
                 name: "topdgi.xml",
-                category: "系統部署",
+                category: "職員電腦需安裝檔案",
                 size: "4.2 KB",
                 date: "2026-10-28",
                 icon: "fa-file-code text-indigo-600"
             });
         }
 
-        const tableBody = document.getElementById('fileTableBody');
-        if (tableBody) {
-            tableBody.innerHTML = sharedFiles.map(f => `
+        // 渲染「職員電腦」表格
+        const staffTableBody = document.getElementById('staffFileTableBody');
+        if (staffTableBody) {
+            staffTableBody.innerHTML = staffFiles.map(f => `
                 <tr class="hover:bg-slate-50/80 transition">
                     <td class="py-3.5 px-6 font-medium text-slate-800 flex items-center gap-3">
                         <i class="fa-solid ${f.icon || 'fa-file'} text-lg"></i>
@@ -249,10 +256,37 @@ function listenFiles() {
             `).join('');
         }
 
-        const fileCountEl = document.getElementById('fileCountBadge');
-        if (fileCountEl) fileCountEl.innerText = `共 ${sharedFiles.length} 個項目`;
+        // 渲染「產線電腦」表格
+        const lineTableBody = document.getElementById('lineFileTableBody');
+        if (lineTableBody) {
+            lineTableBody.innerHTML = lineFiles.map(f => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3.5 px-6 font-medium text-slate-800 flex items-center gap-3">
+                        <i class="fa-solid ${f.icon || 'fa-file'} text-lg"></i>
+                        ${f.name}
+                    </td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs">${f.category}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date}</td>
+                    <td class="py-3.5 px-6 text-right">
+                        <button onclick="downloadCloudFile('${f.id}')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
+                            <i class="fa-solid fa-download mr-1"></i> 下載
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 更新數量標籤
+        const staffBadge = document.getElementById('staffFileCountBadge');
+        if (staffBadge) staffBadge.innerText = `共 ${staffFiles.length} 個項目`;
+        
+        const lineBadge = document.getElementById('lineFileCountBadge');
+        if (lineBadge) lineBadge.innerText = `共 ${lineFiles.length} 個項目`;
+
+        const totalCount = staffFiles.length + lineFiles.length;
         const fileCountDisplay = document.getElementById('fileCountDisplay');
-        if (fileCountDisplay) fileCountDisplay.innerText = `${sharedFiles.length} 個`;
+        if (fileCountDisplay) fileCountDisplay.innerText = `${totalCount} 個`;
     });
 }
 
@@ -503,5 +537,5 @@ window.onload = function() {
     listenBroadcasts();
     listenFiles();
     listenWorkstations();
-    applyRolePermissions(); // 套用權限：預設以 Lyon 身分載入
+    applyRolePermissions();
 };
