@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鼎顓電子股份有限公司 (Intranet Hub)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 引入獨立的樣式檔 -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800">
+
+    <!-- Custom Modal for Notifications / Alerts -->
+    <div id="customModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform transition-all">
+            <div id="modalHeader" class="bg-corporate-600 px-6 py-4 flex items-center justify-between text-white">
+                <h3 id="modalTitle" class="font-bold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-circle-info"></i> 系統提示
+                </h3>
+                <button onclick="closeModal()" class="text-white/80 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <p id="modalBody" class="text-slate-600 leading-relaxed">提示訊息內容...</p>
+            </div>
+            <div class="bg-slate-50 px-6 py-3 flex justify-end gap-3 border-t border-slate-100">
+                <button onclick="closeModal()" class="px-4 py-2 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg font-medium text-sm transition shadow-sm">
+                    確定
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Navigation Header -->
+    <header class="bg-corporate-900 text-white shadow-md z-20 flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand Logo & Title -->
+            <div class="flex items-center space-x-3">
+                <div class="bg-corporate-600 p-2 rounded-lg text-white shadow-inner">
+                    <i class="fa-solid fa-network-wired text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight leading-tight">鼎顓電子股份有限公司</h1>
+                    <span class="text-xs text-corporate-200/70"></span>
+                </div>
+            </div>
+
+            <!-- User Info & System Status -->
+            <div class="flex items-center space-x-6">
+                <!-- SignalR Connection Status Badge -->
+                <div class="hidden sm:flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700 text-xs">
+                    <span class="relative flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span class="text-slate-300 font-medium">SignalR: <span class="text-emerald-400 font-semibold">已連線</span></span>
+                </div>
+
+                <!-- User Profile Info -->
+                <div class="flex items-center space-x-3 border-l border-slate-700 pl-6">
+                    <div class="w-9 h-9 rounded-full bg-corporate-600 flex items-center justify-center font-bold text-white shadow">
+                        IT
+                    </div>
+                    <div class="hidden md:block text-left">
+                        <div class="text-sm font-semibold leading-tight">IT -Lyon</div>
+                        <div class="text-xs text-slate-400">資訊部-系統管理員</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-y-auto">
+
+        <!-- Navigation Tabs -->
+        <div class="flex space-x-2 border-b border-slate-200 pb-2">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-4 py-2 rounded-lg font-medium text-sm transition bg-corporate-600 text-white shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie"></i> 總覽儀表板
+            </button>
+            <button onclick="switchTab('broadcast')" id="tab-broadcast" class="px-4 py-2 rounded-lg font-medium text-sm transition text-slate-600 hover:bg-slate-200/60 flex items-center gap-2">
+                <i class="fa-solid fa-bullhorn"></i> 即時廣播通知
+                <span id="broadcastCount" class="bg-rose-500 text-white text-xs px-1.5 py-0.2 rounded-full">2</span>
+            </button>
+            <button onclick="switchTab('rdp')" id="tab-rdp" class="px-4 py-2 rounded-lg font-medium text-sm transition text-slate-600 hover:bg-slate-200/60 flex items-center gap-2">
+                <i class="fa-solid fa-desktop"></i> 遠端桌面連線
+            </button>
+            <button onclick="switchTab('files')" id="tab-files" class="px-4 py-2 rounded-lg font-medium text-sm transition text-slate-600 hover:bg-slate-200/60 flex items-center gap-2">
+                <i class="fa-solid fa-download"></i> 遠端資料與工具下載
+            </button>
+        </div>
+
+        <!-- TAB 1: 總覽儀表板 (Dashboard) -->
+        <div id="content-dashboard" class="space-y-6">
+            <!-- Welcome Banner -->
+            <div class="bg-gradient-to-r from-corporate-900 to-corporate-700 rounded-2xl p-6 md:p-8 text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div class="space-y-2">
+                    <span class="bg-corporate-600/60 border border-corporate-500/50 text-corporate-100 text-xs px-3 py-1 rounded-full uppercase tracking-wider font-semibold">
+                    </span>
+                    <h2 class="text-2xl md:text-3xl font-bold tracking-tight">歡迎使用DGI資訊管理平台</h2>
+                    <p class="text-corporate-100/80 text-sm max-w-2xl">
+                        公司廣播派發、虛擬工作站遠端桌面與安全公用資料下載通道、自動化安裝部署（如 topdgi.xml）與即時背景通知。
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="switchTab('broadcast')" class="bg-white text-corporate-900 hover:bg-slate-100 font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-corporate-600"></i> 發布廣播
+                    </button>
+                    <button onclick="switchTab('files')" class="bg-corporate-600 hover:bg-corporate-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> 下載安裝包
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Stats & Recent Feeds Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Stat Card 1 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">在線代理節點</p>
+                        <h4 class="text-2xl font-bold text-slate-800">48 / 50</h4>
+                        <span class="text-xs text-emerald-600 font-medium flex items-center gap-1"><i class="fa-solid fa-arrow-up"></i> SignalR 服務正常</span>
+                    </div>
+                    <div class="w-12 h-12 bg-corporate-50 text-corporate-600 rounded-xl flex items-center justify-center text-xl shadow-inner">
+                        <i class="fa-solid fa-server"></i>
+                    </div>
+                </div>
+                <!-- Stat Card 2 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">今日廣播則數</p>
+                        <h4 class="text-2xl font-bold text-slate-800">3 則</h4>
+                        <span class="text-xs text-slate-500 font-medium">涵蓋全體部門</span>
+                    </div>
+                    <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-xl shadow-inner">
+                        <i class="fa-solid fa-bullhorn"></i>
+                    </div>
+                </div>
+                <!-- Stat Card 3 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex items-center justify-between">
+                    <div class="space-y-1">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">公用檔案數量</p>
+                        <h4 class="text-2xl font-bold text-slate-800" id="fileCountDisplay">6 個</h4>
+                        <span class="text-xs text-blue-600 font-medium">包含安裝包與設定檔</span>
+                    </div>
+                    <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl shadow-inner">
+                        <i class="fa-solid fa-file-zipper"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Module Shortcuts -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Broadcast Preview Box -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-bell text-corporate-600"></i> 最新廣播通知
+                            </h3>
+                            <button onclick="switchTab('broadcast')" class="text-xs text-corporate-600 hover:underline font-semibold">查看全部</button>
+                        </div>
+                        <div id="dashboardBroadcastList" class="space-y-3">
+                            <div class="p-3 bg-rose-50 border-l-4 border-rose-500 rounded-r-xl">
+                                <div class="flex justify-between text-xs text-rose-700 font-semibold mb-1">
+                                    <span>[緊急維護] 核心機房不斷電系統測試</span>
+                                    <span>10:30</span>
+                                </div>
+                                <p class="text-xs text-slate-600 line-clamp-2">今日中午 12:30 進行不斷電系統例行檢測，部分伺服器將短暫切換...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="switchTab('broadcast')" class="mt-4 w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 transition">
+                        前往廣播中心發布訊息
+                    </button>
+                </div>
+
+                <!-- RDP Quick Launch Box -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-desktop text-corporate-600"></i>常用遠端桌面
+                            </h3>
+                            <button onclick="switchTab('rdp')" class="text-xs text-corporate-600 hover:underline font-semibold">所有主機</button>
+                        </div>
+                        <div class="space-y-2.5">
+                            <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">V</div>
+                                    <div>
+                                        <div class="text-xs font-semibold text-slate-800">RD-Gateway-01 (財務部專用)</div>
+                                        <div class="text-[10px] text-slate-500">192.168.10.50 · 運作中</div>
+                                    </div>
+                                </div>
+                                <button onclick="triggerRdpConnect('RD-Gateway-01', '192.168.10.50')" class="px-2.5 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
+                                    連線
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="switchTab('rdp')" class="mt-4 w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 transition">
+                        管理所有遠端主機
+                    </button>
+                </div>
+
+                <!-- File Download Quick Box -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-file-arrow-down text-corporate-600"></i>常用安裝與設定
+                            </h3>
+                            <button onclick="switchTab('files')" class="text-xs text-corporate-600 hover:underline font-semibold">檔案庫</button>
+                        </div>
+                        <div class="space-y-2.5">
+                            <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                                <div class="flex items-center gap-3 truncate">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-sm flex-shrink-0"><i class="fa-solid fa-file-code"></i></div>
+                                    <div class="truncate">
+                                        <div class="text-xs font-semibold text-slate-800 truncate">topdgi.xml (安裝設定檔)</div>
+                                        <div class="text-[10px] text-slate-500">45 KB · 系統部署</div>
+                                    </div>
+                                </div>
+                                <button onclick="triggerFileDownload('topdgi.xml', '系統部署')" class="p-2 text-corporate-600 hover:bg-corporate-100 rounded-lg transition">
+                                    <i class="fa-solid fa-download"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="switchTab('files')" class="mt-4 w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-xs rounded-xl border border-slate-200 transition">
+                        前往下載與上傳管理
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: 即時廣播通知 (Broadcast System) -->
+        <div id="content-broadcast" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-bullhorn text-corporate-600"></i> 即時廣播中心                     </h2>
+                    <p class="text-slate-500 text-xs mt-1">發布的廣播將即時推播至全體同仁之背景常駐程式與瀏覽器，強制彈出置頂視窗。</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                        <i class="fa-solid fa-bolt mr-1"></i> SignalR 雙向通道已就緒
+                    </span>
+                </div>
+            </div>
+
+            <!-- Broadcast Input Form -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <i class="fa-solid fa-paper-plane text-corporate-600"></i> 發布新廣播通知
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">通知標題</label>
+                        <input type="text" id="broadcastTitleInput" placeholder="例如：系統維護公告..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-corporate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">發布對象</label>
+                        <select id="broadcastTargetSelect" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-corporate-500 bg-white">
+                            <option value="全體同仁">全體同仁 (All Departments)</option>
+                            <option value="資訊室">資訊室 (IT Department)</option>
+                            <option value="研發部">研發部 (R&D Department)</option>
+                            <option value="財務部">財務部 (Finance Department)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">重要等級</label>
+                        <select id="broadcastLevelSelect" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-corporate-500 bg-white">
+                            <option value="info">一般公告 (Info)</option>
+                            <option value="warning">重要提醒 (Warning)</option>
+                            <option value="danger">緊急通知 (Emergency)</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">廣播內容詳細說明</label>
+                    <textarea id="broadcastContentInput" rows="3" placeholder="請輸入詳細廣播內容..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-corporate-500"></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button onclick="sendBroadcastMessage()" class="px-6 py-2.5 bg-corporate-600 hover:bg-corporate-700 text-white font-medium text-sm rounded-xl shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-satellite-dish"></i> 立即發布廣播 
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Broadcast History List -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <i class="fa-solid fa-clock-rotate-left text-corporate-600"></i> 歷史廣播訊息清單
+                </h3>
+                <div id="broadcastHistoryList" class="space-y-3">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: 遠端桌面連線 (Remote Desktop) -->
+        <div id="content-rdp" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-desktop text-corporate-600"></i> 遠端桌面虛擬工作站
+                    </h2>
+                    <p class="text-slate-500 text-xs mt-1">您可以直接啟動網頁內嵌遠端連線，或下載 RDP 設定檔透過 Windows 內建遠端桌面工具登入。</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="showModal('新增虛擬桌面', '請聯絡系統管理員申請配置專屬遠端工作站。')" class="px-4 py-2 bg-corporate-600 hover:bg-corporate-700 text-white text-xs font-medium rounded-xl transition shadow">
+                        <i class="fa-solid fa-plus mr-1"></i> 新增終端設備
+                    </button>
+                </div>
+            </div>
+
+            <!-- Workstation Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="workstationGrid">
+                <!-- Card 1 -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 運行中
+                            </span>
+                            <span class="text-xs text-slate-400 font-mono">ID: RDP-01</span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-base">RD-Gateway-01 (財務專用)</h3>
+                        <p class="text-xs text-slate-500 mt-1">配置：8 vCPU / 32GB RAM / Windows Server 2022</p>
+                        <div class="mt-4 p-3 bg-slate-50 rounded-xl font-mono text-xs text-slate-600 space-y-1 border border-slate-100">
+                            <div>IP 位址: <span class="text-slate-900 font-semibold">192.168.10.50</span></div>
+                            <div>連接埠: <span class="text-slate-900 font-semibold">3389</span></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                        <button onclick="openWebRdp('RD-Gateway-01', '192.168.10.50')" class="py-2 px-3 bg-corporate-600 hover:bg-corporate-700 text-white rounded-xl text-xs font-medium transition text-center shadow-sm">
+                            <i class="fa-solid fa-globe mr-1"></i> 網頁直接連線
+                        </button>
+                        <button onclick="downloadRdpFile('RD-Gateway-01', '192.168.10.50')" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition text-center border border-slate-200">
+                            <i class="fa-solid fa-file-arrow-down mr-1"></i> 下載.rdp檔
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> 運行中
+                            </span>
+                            <span class="text-xs text-slate-400 font-mono">ID: RDP-02</span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-base">RD-Gateway-02 (研發測試)</h3>
+                        <p class="text-xs text-slate-500 mt-1">配置：16 vCPU / 64GB RAM / Ubuntu 22.04 LTS</p>
+                        <div class="mt-4 p-3 bg-slate-50 rounded-xl font-mono text-xs text-slate-600 space-y-1 border border-slate-100">
+                            <div>IP 位址: <span class="text-slate-900 font-semibold">192.168.10.51</span></div>
+                            <div>連接埠: <span class="text-slate-900 font-semibold">3389</span></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                        <button onclick="openWebRdp('RD-Gateway-02', '192.168.10.51')" class="py-2 px-3 bg-corporate-600 hover:bg-corporate-700 text-white rounded-xl text-xs font-medium transition text-center shadow-sm">
+                            <i class="fa-solid fa-globe mr-1"></i> 網頁直接連線
+                        </button>
+                        <button onclick="downloadRdpFile('RD-Gateway-02', '192.168.10.51')" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition text-center border border-slate-200">
+                            <i class="fa-solid fa-file-arrow-down mr-1"></i> 下載.rdp檔
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col justify-between space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-semibold flex items-center gap-1">
+                                <span class="w-2 h-2 rounded-full bg-amber-500"></span> 維護中
+                            </span>
+                            <span class="text-xs text-slate-400 font-mono">ID: RDP-03</span>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-base">RD-Gateway-03 (公用行政)</h3>
+                        <p class="text-xs text-slate-500 mt-1">配置：4 vCPU / 16GB RAM / Windows 11 Enterprise</p>
+                        <div class="mt-4 p-3 bg-slate-50 rounded-xl font-mono text-xs text-slate-600 space-y-1 border border-slate-100">
+                            <div>IP 位址: <span class="text-slate-900 font-semibold">192.168.10.52</span></div>
+                            <div>連接埠: <span class="text-slate-900 font-semibold">3389</span></div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                        <button onclick="openWebRdp('RD-Gateway-03', '192.168.10.52')" class="py-2 px-3 bg-corporate-600 hover:bg-corporate-700 text-white rounded-xl text-xs font-medium transition text-center shadow-sm">
+                            <i class="fa-solid fa-globe mr-1"></i> 網頁直接連線
+                        </button>
+                        <button onclick="downloadRdpFile('RD-Gateway-03', '192.168.10.52')" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium transition text-center border border-slate-200">
+                            <i class="fa-solid fa-file-arrow-down mr-1"></i> 下載.rdp檔
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: 遠端資料下載與上傳管理 (Remote File Download & Upload) -->
+        <div id="content-files" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-down text-corporate-600"></i> 遠端安全資料與工具下載中心
+                    </h2>
+                    <p class="text-slate-500 text-xs mt-1">提供安裝設定檔（如 topdgi.xml）、批次執行檔及共用表單。管理者可直接於下方上傳新版本檔案。</p>
+                </div>
+            </div>
+
+            <!-- Admin Upload Box -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <i class="fa-solid fa-upload text-corporate-600"></i> 【管理者專區】上傳新版安裝檔或工具
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">選擇檔案 (XML, BAT, ZIP等)</label>
+                        <input type="file" id="adminUploadFile" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-corporate-50 file:text-corporate-700 hover:file:bg-corporate-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">檔案分類說明</label>
+                        <select id="adminFileCategory" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-corporate-500 bg-white">
+                            <option value="系統部署">系統部署 (如 topdgi.xml)</option>
+                            <option value="資訊室工具">資訊室工具 (如安裝包)</option>
+                            <option value="財務部表單">財務部表單</option>
+                            <option value="人事行政">人事行政</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="handleAdminUpload()" class="w-full py-2 bg-corporate-600 hover:bg-corporate-700 text-white font-medium text-xs rounded-xl shadow transition">
+                            <i class="fa-solid fa-cloud-arrow-up mr-1"></i> 確認上傳至伺服器
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Explorer Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                    <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">共用伺服器儲存庫 (\\filesrv01\public)</span>
+                    <span id="fileCountBadge" class="text-xs text-slate-500">共 5 個項目</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr class="bg-slate-100/70 text-slate-600 text-xs uppercase tracking-wider border-b border-slate-200">
+                                <th class="py-3 px-6 font-semibold">檔案名稱</th>
+                                <th class="py-3 px-6 font-semibold">分類</th>
+                                <th class="py-3 px-6 font-semibold">大小</th>
+                                <th class="py-3 px-6 font-semibold">最後更新</th>
+                                <th class="py-3 px-6 font-semibold text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fileTableBody" class="divide-y divide-slate-100">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Access Audit Log Simulation Box -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-3">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-corporate-600"></i> 近期下載與存取稽核日誌 (Audit Trail)
+                </h3>
+                <div id="auditLogContainer" class="bg-slate-900 text-slate-300 font-mono text-xs p-4 rounded-xl space-y-1.5 max-h-40 overflow-y-auto">
+                    <div>[2026-03-22 10:15:20] User: 張資訊 (IT) - Downloaded file: topdgi.xml (IP: 192.168.1.105)</div>
+                    <div>[2026-03-22 09:42:11] User: 王研發 (R&D) - Downloaded file: 公司標準VPN連線憑證與設定包.zip (IP: 192.168.1.118)</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-500 flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>© 2026 公司資訊室 Intranet Hub Systems. All Rights Reserved.</div>
+            <div class="flex items-center space-x-4">
+                <span>資安分機：#8888</span>
+                <span>IT Helpdesk: it-support@company.com</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 引入獨立的 JavaScript 邏輯檔 -->
+    <script src="app.js"></script>
+</body>
+</html>
