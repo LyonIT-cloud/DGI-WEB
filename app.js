@@ -124,7 +124,6 @@ function listenFiles() {
             sharedFiles.push({ id: doc.id, ...doc.data() });
         });
 
-        // 如果資料庫是空的，放入預設的 topdgi.xml
         if (sharedFiles.length === 0) {
             sharedFiles.push({
                 name: "topdgi.xml",
@@ -132,7 +131,7 @@ function listenFiles() {
                 size: "4.2 KB",
                 date: "2026-10-28",
                 icon: "fa-file-code text-indigo-600",
-                fileData: "<?xml version='1.0'?><settings><config>default</config></settings>"
+                fileData: ""
             });
         }
 
@@ -148,7 +147,7 @@ function listenFiles() {
                     <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size}</td>
                     <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date}</td>
                     <td class="py-3.5 px-6 text-right">
-                        <button onclick='downloadCloudFile(\`${encodeURIComponent(f.name)}\`, \`${encodeURIComponent(f.fileData || '')}\`)' class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
+                        <button onclick='downloadCloudFile(\`${encodeURIComponent(f.name)}\`, \`${f.fileData || ''}\`)' class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
                             <i class="fa-solid fa-download mr-1"></i> 下載
                         </button>
                     </td>
@@ -163,33 +162,34 @@ function listenFiles() {
     });
 }
 
-// 3. 管理者上傳檔案到 Firestore 雲端
+// 3. 管理者上傳檔案到 Firestore 雲端（支援 Excel 等二進位檔案轉 Base64）
 window.handleAdminUpload = async function() {
     const fileInput = document.getElementById('adminUploadFile');
     const categorySelect = document.getElementById('adminFileCategory');
 
     if (!fileInput.files || fileInput.files.length === 0) {
-        showModal('尚未選擇檔案', '請先點擊選擇您要上傳的安裝檔或設定檔。');
+        showModal('尚未選擇檔案', '請先點擊選擇您要上傳的安裝檔或表格。');
         return;
     }
 
     const file = fileInput.files[0];
     
-    // 限制檔案大小小於 1MB，確保完全符合幾 KB 的輕量檔案需求
+    // 限制 1MB 以內的輕量檔案
     if (file.size > 1024 * 1024) {
-        showModal('檔案過大', '此上傳通道專為幾 KB 輕量設定檔設計，請選擇 1MB 以下的檔案。');
+        showModal('檔案過大', '此上傳通道專為 1MB 以下的輕量檔案設計。');
         return;
     }
 
     const reader = new FileReader();
     reader.onload = async function(e) {
-        const fileContent = e.target.result; // 讀取檔案文字內容
+        const base64String = e.target.result; // 轉為 Base64 字串，完美支援 Excel
         const now = new Date();
         const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
         
         let iconClass = 'fa-file text-slate-600';
         if (file.name.endsWith('.xml')) iconClass = 'fa-file-code text-indigo-600';
         else if (file.name.endsWith('.bat')) iconClass = 'fa-file-lines text-amber-600';
+        else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) iconClass = 'fa-file-excel text-emerald-600';
         else if (file.name.endsWith('.zip')) iconClass = 'fa-file-zipper text-amber-600';
 
         try {
@@ -199,36 +199,56 @@ window.handleAdminUpload = async function() {
                 size: (file.size / 1024).toFixed(1) + ' KB',
                 date: dateStr,
                 icon: iconClass,
-                fileData: fileContent,
+                fileData: base64String,
                 timestamp: serverTimestamp()
             });
 
             fileInput.value = '';
-            showModal('雲端上傳成功', `已成功將「${file.name}」上傳至 Firebase 雲端資料庫，全體同仁現已可即時下載！`);
+            showModal('雲端上傳成功', `已成功將「${file.name}」上傳至 Firebase 雲端資料庫！`);
         } catch (err) {
             console.error("檔案上傳失敗: ", err);
             showModal('上傳失敗', '無法寫入雲端資料庫，請檢查網路連線。');
         }
     };
-    reader.readAsText(file);
+    reader.readAsDataURL(file);
 }
 
-// 4. 同仁點擊下載雲端檔案
-window.downloadCloudFile = function(encodedName, encodedData) {
+// 4. 同仁點擊下載雲端檔案（完整支援 Base64 還原下載）
+window.downloadCloudFile = function(encodedName, base64Data) {
     const fileName = decodeURIComponent(encodedName);
-    const fileContent = decodeURIComponent(encodedData);
 
-    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+        // 如果沒有資料內容的防護
+        if (!base64Data) {
+            showModal('下載提示', `檔案 ${fileName} 內容為空或為預設項目。`);
+            return;
+        }
 
-    showModal('檔案下載成功', `已成功從雲端下載檔案：${fileName}`);
+        // 將 Base64 還原為二進位檔案
+        const arr = base64Data.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+
+        const blob = new Blob([u8arr], { type: mime });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showModal('檔案下載成功', `已成功從雲端下載檔案：${fileName}`);
+    } catch (e) {
+        console.error("下載失敗: ", e);
+        showModal('下載失敗', '檔案解析或下載過程發生錯誤。');
+    }
 }
 
 // 寫入廣播至 Firestore 雲端資料庫
