@@ -16,16 +16,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 預設共用檔案清單（檔案管理）
-let sharedFiles = [
-    { id: 1, name: "topdgi.xml", category: "系統部署", size: "45 KB", date: "2026-03-22", icon: "fa-file-code text-indigo-600" },
-    { id: 2, name: "install.bat", category: "系統部署", size: "2 KB", date: "2026-03-22", icon: "fa-file-lines text-amber-600" },
-    { id: 3, name: "2026年度出差費用請款單.xlsx", category: "財務部表單", size: "1.2 MB", date: "2026-03-20", icon: "fa-file-excel text-emerald-600" },
-    { id: 4, name: "資訊安全政策規範與切結書_v4.pdf", category: "人事行政", size: "3.8 MB", date: "2026-03-15", icon: "fa-file-pdf text-rose-600" },
-    { id: 5, name: "公司標準VPN連線憑證與設定包.zip", category: "資訊室工具", size: "15.4 MB", date: "2026-03-10", icon: "fa-file-zipper text-amber-600" },
-    { id: 6, name: "專案開發需求規格書範本.docx", category: "研發部範本", size: "850 KB", date: "2026-02-28", icon: "fa-file-word text-blue-600" }
-];
-
 // Tab Switching Logic
 window.switchTab = function(tabId) {
     const tabs = ['dashboard', 'broadcast', 'rdp', 'files'];
@@ -55,16 +45,15 @@ window.closeModal = function() {
     document.getElementById('customModal').classList.add('hidden');
 }
 
-// 即時監聽並渲染 Firestore 的廣播資料
+// 1. 即時監聽 Firestore 的廣播資料
 function listenBroadcasts() {
-    const q = query(collection(db, "broadcasts"), orderBy("time", "desc"));
+    const q = query(collection(db, "broadcasts"), orderBy("timestamp", "desc"));
     onSnapshot(q, (snapshot) => {
         let broadcasts = [];
         snapshot.forEach((doc) => {
             broadcasts.push(doc.data());
         });
 
-        // 如果資料庫還沒有資料，給予預設提示
         if (broadcasts.length === 0) {
             broadcasts.push({
                 title: "[系統就緒] 雲端廣播中心已啟動",
@@ -126,35 +115,56 @@ function listenBroadcasts() {
     });
 }
 
-// Render File Repository Table
-function renderFiles() {
-    const tableBody = document.getElementById('fileTableBody');
-    if (tableBody) {
-        tableBody.innerHTML = sharedFiles.map(f => `
-            <tr class="hover:bg-slate-50/80 transition">
-                <td class="py-3.5 px-6 font-medium text-slate-800 flex items-center gap-3">
-                    <i class="fa-solid ${f.icon} text-lg"></i>
-                    ${f.name}
-                </td>
-                <td class="py-3.5 px-6 text-slate-600 text-xs">${f.category}</td>
-                <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size}</td>
-                <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date}</td>
-                <td class="py-3.5 px-6 text-right">
-                    <button onclick="triggerFileDownload('${f.name}', '${f.category}')" class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
-                        <i class="fa-solid fa-download mr-1"></i> 下載
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-    const fileCountEl = document.getElementById('fileCountBadge');
-    if (fileCountEl) fileCountEl.innerText = `共 ${sharedFiles.length} 個項目`;
-    const fileCountDisplay = document.getElementById('fileCountDisplay');
-    if (fileCountDisplay) fileCountDisplay.innerText = `${sharedFiles.length} 個`;
+// 2. 即時監聽 Firestore 的共用檔案清單（雲端檔案櫃）
+function listenFiles() {
+    const q = query(collection(db, "sharedFiles"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (snapshot) => {
+        let sharedFiles = [];
+        snapshot.forEach((doc) => {
+            sharedFiles.push({ id: doc.id, ...doc.data() });
+        });
+
+        // 如果資料庫是空的，放入預設的 topdgi.xml
+        if (sharedFiles.length === 0) {
+            sharedFiles.push({
+                name: "topdgi.xml",
+                category: "系統部署",
+                size: "4.2 KB",
+                date: "2026-10-28",
+                icon: "fa-file-code text-indigo-600",
+                fileData: "<?xml version='1.0'?><settings><config>default</config></settings>"
+            });
+        }
+
+        const tableBody = document.getElementById('fileTableBody');
+        if (tableBody) {
+            tableBody.innerHTML = sharedFiles.map(f => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3.5 px-6 font-medium text-slate-800 flex items-center gap-3">
+                        <i class="fa-solid ${f.icon || 'fa-file'} text-lg"></i>
+                        ${f.name}
+                    </td>
+                    <td class="py-3.5 px-6 text-slate-600 text-xs">${f.category}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date}</td>
+                    <td class="py-3.5 px-6 text-right">
+                        <button onclick='downloadCloudFile(\`${encodeURIComponent(f.name)}\`, \`${encodeURIComponent(f.fileData || '')}\`)' class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
+                            <i class="fa-solid fa-download mr-1"></i> 下載
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        const fileCountEl = document.getElementById('fileCountBadge');
+        if (fileCountEl) fileCountEl.innerText = `共 ${sharedFiles.length} 個項目`;
+        const fileCountDisplay = document.getElementById('fileCountDisplay');
+        if (fileCountDisplay) fileCountDisplay.innerText = `${sharedFiles.length} 個`;
+    });
 }
 
-// Admin Upload Function
-window.handleAdminUpload = function() {
+// 3. 管理者上傳檔案到 Firestore 雲端
+window.handleAdminUpload = async function() {
     const fileInput = document.getElementById('adminUploadFile');
     const categorySelect = document.getElementById('adminFileCategory');
 
@@ -164,28 +174,61 @@ window.handleAdminUpload = function() {
     }
 
     const file = fileInput.files[0];
-    const now = new Date();
-    const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
     
-    let iconClass = 'fa-file text-slate-600';
-    if (file.name.endsWith('.xml')) iconClass = 'fa-file-code text-indigo-600';
-    else if (file.name.endsWith('.bat')) iconClass = 'fa-file-lines text-amber-600';
-    else if (file.name.endsWith('.zip')) iconClass = 'fa-file-zipper text-amber-600';
+    // 限制檔案大小小於 1MB，確保完全符合幾 KB 的輕量檔案需求
+    if (file.size > 1024 * 1024) {
+        showModal('檔案過大', '此上傳通道專為幾 KB 輕量設定檔設計，請選擇 1MB 以下的檔案。');
+        return;
+    }
 
-    const newFile = {
-        id: sharedFiles.length + 1,
-        name: file.name,
-        category: categorySelect.value,
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        date: dateStr,
-        icon: iconClass
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const fileContent = e.target.result; // 讀取檔案文字內容
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
+        
+        let iconClass = 'fa-file text-slate-600';
+        if (file.name.endsWith('.xml')) iconClass = 'fa-file-code text-indigo-600';
+        else if (file.name.endsWith('.bat')) iconClass = 'fa-file-lines text-amber-600';
+        else if (file.name.endsWith('.zip')) iconClass = 'fa-file-zipper text-amber-600';
+
+        try {
+            await addDoc(collection(db, "sharedFiles"), {
+                name: file.name,
+                category: categorySelect.value,
+                size: (file.size / 1024).toFixed(1) + ' KB',
+                date: dateStr,
+                icon: iconClass,
+                fileData: fileContent,
+                timestamp: serverTimestamp()
+            });
+
+            fileInput.value = '';
+            showModal('雲端上傳成功', `已成功將「${file.name}」上傳至 Firebase 雲端資料庫，全體同仁現已可即時下載！`);
+        } catch (err) {
+            console.error("檔案上傳失敗: ", err);
+            showModal('上傳失敗', '無法寫入雲端資料庫，請檢查網路連線。');
+        }
     };
+    reader.readAsText(file);
+}
 
-    sharedFiles.unshift(newFile);
-    renderFiles();
-    fileInput.value = '';
+// 4. 同仁點擊下載雲端檔案
+window.downloadCloudFile = function(encodedName, encodedData) {
+    const fileName = decodeURIComponent(encodedName);
+    const fileContent = decodeURIComponent(encodedData);
 
-    showModal('檔案上傳成功', `已成功將「${newFile.name}」加入清單，全體同仁現已可同步下載。`);
+    const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showModal('檔案下載成功', `已成功從雲端下載檔案：${fileName}`);
 }
 
 // 寫入廣播至 Firestore 雲端資料庫
@@ -225,7 +268,7 @@ window.sendBroadcastMessage = async function() {
     }
 }
 
-// RDP Trigger Functions
+// RDP 相關模擬功能
 window.openWebRdp = function(name, ip) {
     showModal(`啟動網頁遠端桌面: ${name}`, `正在透過 HTML5 Gateway 建立與主機 ${ip} 的加密連線工作階段...\n\n(模擬畫面：已成功掛載遠端桌面串流到瀏覽器視窗)`);
 }
@@ -249,23 +292,12 @@ window.triggerRdpConnect = function(name, ip) {
     openWebRdp(name, ip);
 }
 
-// File Download Trigger Functions
 window.triggerFileDownload = function(fileName, category) {
     showModal('安全下載通知', `您正在下載：「${fileName}」\n分類：${category}\n\n系統已自動通過憑證驗證並開始下載檔案。`);
-
-    const now = new Date();
-    const timeLog = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-    
-    const logContainer = document.getElementById('auditLogContainer');
-    if (logContainer) {
-        const newLog = document.createElement('div');
-        newLog.innerHTML = `[${timeLog}] User: 張資訊 - Downloaded file: ${fileName} (IP: 192.168.1.105)`;
-        logContainer.insertBefore(newLog, logContainer.firstChild);
-    }
 }
 
-// Initialize on window load
+// 網頁載入完成後啟動監聽
 window.onload = function() {
     listenBroadcasts();
-    renderFiles();
+    listenFiles();
 };
