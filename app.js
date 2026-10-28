@@ -1,26 +1,22 @@
-// In-memory data store for broadcast messages
-let broadcasts = [
-    {
-        id: 1,
-        title: "[緊急維護] 核心機房不斷電系統測試",
-        target: "全體同仁",
-        level: "danger",
-        content: "今日中午 12:30 進行不斷電系統例行檢測，部分伺服器將短暫切換至備用電力，請同仁提前儲存手邊文件。",
-        time: "10:30",
-        date: "2026-03-22"
-    },
-    {
-        id: 2,
-        title: "【公告】全新遠端桌面與自動化安裝上線",
-        target: "全體同仁",
-        level: "info",
-        content: "即日起同仁可至遠端資料下載區取得 topdgi.xml 設定檔與自動安裝包，提升作業流暢度。",
-        time: "09:00",
-        date: "2026-03-22"
-    }
-];
+// --- Firebase 核心與 Firestore 引入 ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-// Shared File Repository Data (including your topdgi.xml)
+// 你的 Firebase 專案設定
+const firebaseConfig = {
+    apiKey: "AIzaSyAeNmWRMXBeFBstWuyGJxlUxiHOkehuY6Y",
+    authDomain: "dgi-web-1e4dc.firebaseapp.com",
+    projectId: "dgi-web-1e4dc",
+    storageBucket: "dgi-web-1e4dc.firebasestorage.app",
+    messagingSenderId: "555924211050",
+    appId: "1:555924211050:web:e72ea80b83631f9078d113"
+};
+
+// 初始化 Firebase 與 Firestore
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// 預設共用檔案清單（檔案管理）
 let sharedFiles = [
     { id: 1, name: "topdgi.xml", category: "系統部署", size: "45 KB", date: "2026-03-22", icon: "fa-file-code text-indigo-600" },
     { id: 2, name: "install.bat", category: "系統部署", size: "2 KB", date: "2026-03-22", icon: "fa-file-lines text-amber-600" },
@@ -31,11 +27,12 @@ let sharedFiles = [
 ];
 
 // Tab Switching Logic
-function switchTab(tabId) {
+window.switchTab = function(tabId) {
     const tabs = ['dashboard', 'broadcast', 'rdp', 'files'];
     tabs.forEach(t => {
         const contentEl = document.getElementById(`content-${t}`);
         const tabBtn = document.getElementById(`tab-${t}`);
+        if (!contentEl || !tabBtn) return;
         if (t === tabId) {
             contentEl.classList.remove('hidden');
             tabBtn.className = "px-4 py-2 rounded-lg font-medium text-sm transition bg-corporate-600 text-white shadow-sm flex items-center gap-2";
@@ -48,65 +45,85 @@ function switchTab(tabId) {
 }
 
 // Custom Modal Functions
-function showModal(title, body) {
+window.showModal = function(title, body) {
     document.getElementById('modalTitle').innerHTML = `<i class="fa-solid fa-circle-info"></i> ${title}`;
     document.getElementById('modalBody').innerText = body;
     document.getElementById('customModal').classList.remove('hidden');
 }
 
-function closeModal() {
+window.closeModal = function() {
     document.getElementById('customModal').classList.add('hidden');
 }
 
-// Render Broadcast Lists
-function renderBroadcasts() {
-    const dashList = document.getElementById('dashboardBroadcastList');
-    if (dashList && broadcasts.length > 0) {
-        const latest = broadcasts[0];
-        let borderClass = 'border-blue-500 bg-blue-50 text-blue-700';
-        if (latest.level === 'danger') borderClass = 'border-rose-500 bg-rose-50 text-rose-700';
-        if (latest.level === 'warning') borderClass = 'border-amber-500 bg-amber-50 text-amber-700';
+// 即時監聽並渲染 Firestore 的廣播資料
+function listenBroadcasts() {
+    const q = query(collection(db, "broadcasts"), orderBy("time", "desc"));
+    onSnapshot(q, (snapshot) => {
+        let broadcasts = [];
+        snapshot.forEach((doc) => {
+            broadcasts.push(doc.data());
+        });
 
-        dashList.innerHTML = `
-            <div class="p-3 border-l-4 ${borderClass} rounded-r-xl">
-                <div class="flex justify-between text-xs font-semibold mb-1">
-                    <span>[${latest.target}] ${latest.title}</span>
-                    <span>${latest.time}</span>
-                </div>
-                <p class="text-xs text-slate-600 line-clamp-2">${latest.content}</p>
-            </div>
-        `;
-    }
+        // 如果資料庫還沒有資料，給予預設提示
+        if (broadcasts.length === 0) {
+            broadcasts.push({
+                title: "[系統就緒] 雲端廣播中心已啟動",
+                target: "全體同仁",
+                level: "info",
+                content: "即日起廣播通知已串接 Firebase 雲端資料庫，將即時同步至全體同仁。",
+                time: "剛剛",
+                date: "2026-10-28"
+            });
+        }
 
-    const historyList = document.getElementById('broadcastHistoryList');
-    if (historyList) {
-        historyList.innerHTML = broadcasts.map(b => {
-            let badgeBg = 'bg-blue-100 text-blue-800';
-            let icon = 'fa-circle-info text-blue-600';
-            if (b.level === 'danger') { badgeBg = 'bg-rose-100 text-rose-800'; icon = 'fa-triangle-exclamation text-rose-600'; }
-            if (b.level === 'warning') { badgeBg = 'bg-amber-100 text-amber-800'; icon = 'fa-circle-exclamation text-amber-600'; }
+        const dashList = document.getElementById('dashboardBroadcastList');
+        if (dashList && broadcasts.length > 0) {
+            const latest = broadcasts[0];
+            let borderClass = 'border-blue-500 bg-blue-50 text-blue-700';
+            if (latest.level === 'danger') borderClass = 'border-rose-500 bg-rose-50 text-rose-700';
+            if (latest.level === 'warning') borderClass = 'border-amber-500 bg-amber-50 text-amber-700';
 
-            return `
-                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div class="space-y-1">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid ${icon}"></i>
-                            <h4 class="font-bold text-slate-800 text-sm">${b.title}</h4>
-                            <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${badgeBg}">${b.target}</span>
-                        </div>
-                        <p class="text-xs text-slate-600 leading-relaxed pl-5">${b.content}</p>
+            dashList.innerHTML = `
+                <div class="p-3 border-l-4 ${borderClass} rounded-r-xl">
+                    <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span>[${latest.target}] ${latest.title}</span>
+                        <span>${latest.time || '剛剛'}</span>
                     </div>
-                    <div class="text-right text-xs text-slate-400 flex-shrink-0 pl-5">
-                        <div>${b.date} ${b.time}</div>
-                        <span class="text-emerald-600 font-medium">SignalR 已推播</span>
-                    </div>
+                    <p class="text-xs text-slate-600 line-clamp-2">${latest.content}</p>
                 </div>
             `;
-        }).join('');
-    }
+        }
 
-    const countEl = document.getElementById('broadcastCount');
-    if (countEl) countEl.innerText = broadcasts.length;
+        const historyList = document.getElementById('broadcastHistoryList');
+        if (historyList) {
+            historyList.innerHTML = broadcasts.map(b => {
+                let badgeBg = 'bg-blue-100 text-blue-800';
+                let icon = 'fa-circle-info text-blue-600';
+                if (b.level === 'danger') { badgeBg = 'bg-rose-100 text-rose-800'; icon = 'fa-triangle-exclamation text-rose-600'; }
+                if (b.level === 'warning') { badgeBg = 'bg-amber-100 text-amber-800'; icon = 'fa-circle-exclamation text-amber-600'; }
+
+                return `
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid ${icon}"></i>
+                                <h4 class="font-bold text-slate-800 text-sm">${b.title}</h4>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${badgeBg}">${b.target}</span>
+                            </div>
+                            <p class="text-xs text-slate-600 leading-relaxed pl-5">${b.content}</p>
+                        </div>
+                        <div class="text-right text-xs text-slate-400 flex-shrink-0 pl-5">
+                            <div>${b.date || ''} ${b.time || ''}</div>
+                            <span class="text-emerald-600 font-medium">雲端同步已就緒</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        const countEl = document.getElementById('broadcastCount');
+        if (countEl) countEl.innerText = broadcasts.length;
+    });
 }
 
 // Render File Repository Table
@@ -137,7 +154,7 @@ function renderFiles() {
 }
 
 // Admin Upload Function
-function handleAdminUpload() {
+window.handleAdminUpload = function() {
     const fileInput = document.getElementById('adminUploadFile');
     const categorySelect = document.getElementById('adminFileCategory');
 
@@ -168,11 +185,11 @@ function handleAdminUpload() {
     renderFiles();
     fileInput.value = '';
 
-    showModal('檔案上傳成功', `已成功將「${newFile.name}」上傳至伺服器共用儲存庫,全體同仁現已可同步下載。`);
+    showModal('檔案上傳成功', `已成功將「${newFile.name}」加入清單，全體同仁現已可同步下載。`);
 }
 
-// Send Broadcast Simulation via SignalR
-function sendBroadcastMessage() {
+// 寫入廣播至 Firestore 雲端資料庫
+window.sendBroadcastMessage = async function() {
     const titleInput = document.getElementById('broadcastTitleInput');
     const targetSelect = document.getElementById('broadcastTargetSelect');
     const levelSelect = document.getElementById('broadcastLevelSelect');
@@ -187,31 +204,33 @@ function sendBroadcastMessage() {
     const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
     const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
 
-    const newMsg = {
-        id: broadcasts.length + 1,
-        title: titleInput.value,
-        target: targetSelect.value,
-        level: levelSelect.value,
-        content: contentInput.value,
-        time: timeStr,
-        date: dateStr
-    };
+    try {
+        await addDoc(collection(db, "broadcasts"), {
+            title: titleInput.value,
+            target: targetSelect.value,
+            level: levelSelect.value,
+            content: contentInput.value,
+            time: timeStr,
+            date: dateStr,
+            timestamp: serverTimestamp()
+        });
 
-    broadcasts.unshift(newMsg);
-    renderBroadcasts();
+        titleInput.value = '';
+        contentInput.value = '';
 
-    titleInput.value = '';
-    contentInput.value = '';
-
-    showModal('SignalR 廣播推播成功', `已成功透過伺服器通道向「${newMsg.target}」背景常駐程式及瀏覽器推播強制彈跳通知！`);
+        showModal('雲端廣播發布成功', `已成功將通知推送到 Firebase 雲端資料庫，全體同仁畫面將即時同步！`);
+    } catch (e) {
+        console.error("發布失敗: ", e);
+        showModal('發布失敗', '無法寫入雲端資料庫，請檢查網路連線或 Firebase 權限。');
+    }
 }
 
 // RDP Trigger Functions
-function openWebRdp(name, ip) {
+window.openWebRdp = function(name, ip) {
     showModal(`啟動網頁遠端桌面: ${name}`, `正在透過 HTML5 Gateway 建立與主機 ${ip} 的加密連線工作階段...\n\n(模擬畫面：已成功掛載遠端桌面串流到瀏覽器視窗)`);
 }
 
-function downloadRdpFile(name, ip) {
+window.downloadRdpFile = function(name, ip) {
     const rdpContent = `full address:s:${ip}:3389\nscreen mode id:i:2\ndesktopwidth:i:1920\ndesktopheight:i:1080\nsession bpp:i:32\nusername:s:Corp\\\\User`;
     const blob = new Blob([rdpContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -226,12 +245,12 @@ function downloadRdpFile(name, ip) {
     showModal('RDP 檔案下載成功', `已自動為您產生遠端桌面連線設定檔 [${name}.rdp]。請直接點擊兩下開啟並輸入您的網域密碼進行登入。`);
 }
 
-function triggerRdpConnect(name, ip) {
+window.triggerRdpConnect = function(name, ip) {
     openWebRdp(name, ip);
 }
 
 // File Download Trigger Functions
-function triggerFileDownload(fileName, category) {
+window.triggerFileDownload = function(fileName, category) {
     showModal('安全下載通知', `您正在下載：「${fileName}」\n分類：${category}\n\n系統已自動通過憑證驗證並開始下載檔案。`);
 
     const now = new Date();
@@ -247,6 +266,6 @@ function triggerFileDownload(fileName, category) {
 
 // Initialize on window load
 window.onload = function() {
-    renderBroadcasts();
+    listenBroadcasts();
     renderFiles();
 };
