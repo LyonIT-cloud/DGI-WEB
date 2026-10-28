@@ -148,6 +148,10 @@
                     <a href="https://line.me/zh-hant/" target="_blank" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
                         <i class="fa-brands fa-line text-lg"></i> LINE 官方諮詢
                     </a>
+                    <!-- 微信官方網站捷徑 -->
+                    <a href="https://weixin.qq.com/" target="_blank" class="bg-teal-600 hover:bg-teal-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
+                        <i class="fa-brands fa-weixin text-lg"></i> 微信官方網站
+                    </a>
                 </div>
             </div>
 
@@ -384,12 +388,16 @@
             <!-- Admin Upload Box (僅限管理者 Lyon 顯示) -->
             <div id="adminUploadSection" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
                 <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
-                    <i class="fa-solid fa-upload text-corporate-600"></i> 【管理者專區】上傳新版安裝檔或工具
+                    <i class="fa-solid fa-upload text-corporate-600"></i> 【管理者專區】新增下載連結 (突破 1MB 限制)
                 </h3>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">選擇檔案 (XML, BAT, Excel等)</label>
-                        <input type="file" id="adminUploadFile" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-corporate-50 file:text-corporate-700 hover:file:bg-corporate-100">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">檔案/工具名稱</label>
+                        <input type="text" id="adminFileNameInput" placeholder="例如：LINE 安裝主程式" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-corporate-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">下載網址 (URL / 路徑)</label>
+                        <input type="text" id="adminFileUrlInput" placeholder="https://... 或 \\filesrv01\..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-corporate-500">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">目標安裝區域</label>
@@ -399,8 +407,8 @@
                         </select>
                     </div>
                     <div class="flex items-end">
-                        <button onclick="handleAdminUpload()" class="w-full py-2 bg-corporate-600 hover:bg-corporate-700 text-white font-medium text-xs rounded-xl shadow transition">
-                            <i class="fa-solid fa-cloud-arrow-up mr-1"></i> 確認上傳至伺服器
+                        <button onclick="handleLinkUpload()" class="w-full py-2 bg-corporate-600 hover:bg-corporate-700 text-white font-medium text-xs rounded-xl shadow transition">
+                            <i class="fa-solid fa-plus mr-1"></i> 新增至下載中心
                         </button>
                     </div>
                 </div>
@@ -464,7 +472,7 @@
                     <i class="fa-solid fa-shield-halved text-corporate-600"></i> 近期下載與存取稽核日誌 (Audit Trail)
                 </h3>
                 <div id="auditLogContainer" class="bg-slate-900 text-slate-300 font-mono text-xs p-4 rounded-xl space-y-1.5 max-h-40 overflow-y-auto">
-                    <div>[2026-10-28 13:00:05] System: 雙軌下載專區（職員/產線）已上線。</div>
+                    <div>[2026-10-28 13:00:05] System: 雙軌下載專區（超連結架構）已上線。</div>
                 </div>
             </div>
         </div>
@@ -479,6 +487,9 @@
                 <span>資安分機：#8888</span>
                 <a href="https://line.me/zh-hant/" target="_blank" class="text-emerald-600 hover:underline flex items-center gap-1 font-medium">
                     <i class="fa-brands fa-line"></i> LINE 官方諮詢
+                </a>
+                <a href="https://weixin.qq.com/" target="_blank" class="text-teal-600 hover:underline flex items-center gap-1 font-medium">
+                    <i class="fa-brands fa-weixin"></i> 微信官方網站
                 </a>
                 <span>IT Helpdesk: it-support@company.com</span>
             </div>
