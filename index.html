@@ -10,8 +10,34 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Inter Font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- 引入獨立的樣式檔 -->
-    <link rel="stylesheet" href="style.css">
+    
+    <!-- 直接內嵌樣式，確保色彩與深色區塊正常顯示 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Microsoft JhengHei', 'sans-serif'],
+                    },
+                    colors: {
+                        corporate: {
+                            50: '#f0f6ff',
+                            100: '#e0eefd',
+                            500: '#0284c7',
+                            600: '#026aa7',
+                            700: '#035388',
+                            900: '#0f2942',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', 'Microsoft JhengHei', sans-serif;
+        }
+    </style>
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800">
 
@@ -491,7 +517,7 @@
         </div>
     </footer>
 
-    <!-- 引入獨立的 JavaScript 邏輯檔 -->
+    <!-- JavaScript 互動邏輯 -->
     <script src="app.js"></script>
 </body>
 </html>
