@@ -200,38 +200,32 @@ function listenBroadcasts() {
     });
 }
 
-// 2. 即時監聽 Firestore 的共用檔案清單（自動分流至職員與產線專區）
+// 2. 即時監聽 Firestore 的超連結檔案清單（自動分流至職員與產線專區）
 function listenFiles() {
     const q = query(collection(db, "sharedFiles"), orderBy("timestamp", "desc"));
     onSnapshot(q, (snapshot) => {
         let staffFiles = [];
         let lineFiles = [];
-        globalFilesMap = {};
 
         snapshot.forEach((doc) => {
             const data = doc.data();
-            globalFilesMap[doc.id] = data;
             
             // 依照分類放入對應陣列
             if (data.category === "產線電腦需安裝檔案") {
                 lineFiles.push({ id: doc.id, ...data });
             } else {
-                staffFiles.push({ id: doc.id, ...data }); // 預設歸類在職員電腦
+                staffFiles.push({ id: doc.id, ...data });
             }
         });
 
         if (staffFiles.length === 0 && lineFiles.length === 0) {
-            globalFilesMap["default_xml"] = {
-                name: "topdgi.xml",
-                fileData: "data:text/xml;base64,PD94bWwgdmVyc2lvbj0nMSw0Jz8+PHNldHRpbmdzPjwvY29uZmlnPjwvc2V0dGluZ3M="
-            };
             staffFiles.push({
-                id: "default_xml",
-                name: "topdgi.xml",
+                name: "LINE 官方安裝程式 (範例)",
                 category: "職員電腦需安裝檔案",
-                size: "4.2 KB",
+                size: "外部連結",
                 date: "2026-10-28",
-                icon: "fa-file-code text-indigo-600"
+                url: "https://line.me/zh-hant/",
+                icon: "fa-brands fa-line text-emerald-600"
             });
         }
 
@@ -245,12 +239,12 @@ function listenFiles() {
                         ${f.name}
                     </td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs">${f.category}</td>
-                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size}</td>
-                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size || '外部連結'}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date || ''}</td>
                     <td class="py-3.5 px-6 text-right">
-                        <button onclick="downloadCloudFile('${f.id}')" class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
-                            <i class="fa-solid fa-download mr-1"></i> 下載
-                        </button>
+                        <a href="${f.url || '#'}" target="_blank" class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm inline-flex items-center gap-1">
+                            <i class="fa-solid fa-download"></i> 下載
+                        </a>
                     </td>
                 </tr>
             `).join('');
@@ -266,12 +260,12 @@ function listenFiles() {
                         ${f.name}
                     </td>
                     <td class="py-3.5 px-6 text-slate-600 text-xs">${f.category}</td>
-                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size}</td>
-                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size || '外部連結'}</td>
+                    <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date || ''}</td>
                     <td class="py-3.5 px-6 text-right">
-                        <button onclick="downloadCloudFile('${f.id}')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
-                            <i class="fa-solid fa-download mr-1"></i> 下載
-                        </button>
+                        <a href="${f.url || '#'}" target="_blank" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium transition shadow-sm inline-flex items-center gap-1">
+                            <i class="fa-solid fa-download"></i> 下載
+                        </a>
                     </td>
                 </tr>
             `).join('');
@@ -370,95 +364,51 @@ window.handleAddWorkstation = async function() {
     }
 }
 
-// 5. 管理者上傳檔案
-window.handleAdminUpload = async function() {
+// 5. 管理者新增超連結下載項目
+window.handleLinkUpload = async function() {
     if (!checkIsAdmin()) {
-        showModal('權限不足', '您目前為一般同仁身份，無權上傳檔案。');
+        showModal('權限不足', '您目前為一般同仁身份，無權新增下載項目。');
         return;
     }
 
-    const fileInput = document.getElementById('adminUploadFile');
+    const nameInput = document.getElementById('adminFileNameInput');
+    const urlInput = document.getElementById('adminFileUrlInput');
     const categorySelect = document.getElementById('adminFileCategory');
 
-    if (!fileInput.files || fileInput.files.length === 0) {
-        showModal('尚未選擇檔案', '請先點擊選擇您要上傳的檔案。');
+    if (!nameInput || !urlInput || !categorySelect) return;
+
+    if (!nameInput.value.trim() || !urlInput.value.trim()) {
+        showModal('欄位不完整', '請輸入檔案名稱與對應的下載網址。');
         return;
     }
 
-    const file = fileInput.files[0];
-    if (file.size > 1024 * 1024) {
-        showModal('檔案過大', '此上傳通道專為 1MB 以下的輕量檔案設計。');
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        const base64String = e.target.result;
-        const now = new Date();
-        const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
-        
-        let iconClass = 'fa-file text-slate-600';
-        if (file.name.endsWith('.xml')) iconClass = 'fa-file-code text-indigo-600';
-        else if (file.name.endsWith('.bat')) iconClass = 'fa-file-lines text-amber-600';
-        else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) iconClass = 'fa-file-excel text-emerald-600';
-        else if (file.name.endsWith('.zip')) iconClass = 'fa-file-zipper text-amber-600';
-
-        try {
-            await addDoc(collection(db, "sharedFiles"), {
-                name: file.name,
-                category: categorySelect.value,
-                size: (file.size / 1024).toFixed(1) + ' KB',
-                date: dateStr,
-                icon: iconClass,
-                fileData: base64String,
-                timestamp: serverTimestamp()
-            });
-
-            fileInput.value = '';
-            showModal('雲端上傳成功', `已成功將「${file.name}」上傳至 Firebase 雲端資料庫！`);
-        } catch (err) {
-            console.error("檔案上傳失敗: ", err);
-            showModal('上傳失敗', '無法寫入雲端資料庫。');
-        }
-    };
-    reader.readAsDataURL(file);
-}
-
-// 6. 下載檔案（全體同仁皆可使用）
-window.downloadCloudFile = function(fileId) {
-    const fileRecord = globalFilesMap[fileId];
-    if (!fileRecord || !fileRecord.fileData) {
-        showModal('下載失敗', '找不到該檔案的雲端資料內容。');
-        return;
-    }
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
+    
+    let iconClass = 'fa-file-arrow-down text-corporate-600';
+    const val = nameInput.value.trim().toLowerCase();
+    if (val.includes('line')) iconClass = 'fa-brands fa-line text-emerald-600';
+    else if (val.endsWith('.xml')) iconClass = 'fa-file-code text-indigo-600';
+    else if (val.endsWith('.bat')) iconClass = 'fa-file-lines text-amber-600';
+    else if (val.includes('excel') || val.includes('xlsx')) iconClass = 'fa-file-excel text-emerald-600';
 
     try {
-        const base64Data = fileRecord.fileData;
-        const fileName = fileRecord.name;
+        await addDoc(collection(db, "sharedFiles"), {
+            name: nameInput.value.trim(),
+            url: urlInput.value.trim(),
+            category: categorySelect.value,
+            size: "外部連結",
+            date: dateStr,
+            icon: iconClass,
+            timestamp: serverTimestamp()
+        });
 
-        const arr = base64Data.split(',');
-        const mime = arr[0].match(/:(.*?);/)[1] || 'application/octet-stream';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-            u8arr[n] = bstr.charCodeAt(n);
-        }
-
-        const blob = new Blob([u8arr], { type: mime });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        showModal('檔案下載成功', `已成功下載檔案：${fileName}`);
-    } catch (e) {
-        console.error("下載失敗: ", e);
-        showModal('下載失敗', '檔案解碼過程發生錯誤。');
+        nameInput.value = '';
+        urlInput.value = '';
+        showModal('新增成功', '已成功將下載連結發布至雲端！');
+    } catch (err) {
+        console.error("新增連結失敗: ", err);
+        showModal('新增失敗', '無法寫入雲端資料庫。');
     }
 }
 
