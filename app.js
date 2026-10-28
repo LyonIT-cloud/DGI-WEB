@@ -29,22 +29,32 @@ function checkIsAdmin() {
     return currentUser.toLowerCase() === "lyon";
 }
 
-// 點擊右上角隨時切換身份測試的互動函式
+// 點擊右上角切換身份時，必須輸入管理者帳號 Lyon
 window.toggleUserRole = function() {
-    if (currentUser.toLowerCase() === "lyon") {
+    if (!checkIsAdmin()) {
+        const inputAccount = prompt("【資安驗證】請輸入系統管理員帳號：");
+        
+        if (inputAccount === null) return; // 按取消
+
+        if (inputAccount.trim() === "Lyon") {
+            currentUser = "Lyon";
+            document.getElementById('userNameDisplay').innerText = "IT -Lyon";
+            document.getElementById('userRoleDisplay').innerText = "資訊部-系統管理員";
+            document.getElementById('userAvatarIcon').innerText = "IT";
+            showModal('驗證成功', '歡迎回來，系統管理員 Lyon。已解鎖所有後台管理權限。');
+            applyRolePermissions();
+        } else {
+            showModal('驗證失敗', '帳號錯誤！您無法獲得管理員權限。');
+        }
+    } else {
+        // 如果目前是 Lyon，點擊則登出切換回一般同仁
         currentUser = "User";
         document.getElementById('userNameDisplay').innerText = "同仁 - User";
         document.getElementById('userRoleDisplay').innerText = "一般員工";
         document.getElementById('userAvatarIcon').innerText = "US";
-        showModal('身份切換成功', '目前已切換為【一般同仁】身份（管理員上傳與發布區塊已自動隱藏）。');
-    } else {
-        currentUser = "Lyon";
-        document.getElementById('userNameDisplay').innerText = "IT -Lyon";
-        document.getElementById('userRoleDisplay').innerText = "資訊部-系統管理員";
-        document.getElementById('userAvatarIcon').innerText = "IT";
-        showModal('身份切換成功', '目前已切換為【系統管理員 (Lyon)】身份（已解鎖所有管理權限）。');
+        showModal('已登出管理員', '目前已切換回【一般同仁】安全檢視模式。');
+        applyRolePermissions();
     }
-    applyRolePermissions();
 }
 
 // 根據權限動態隱藏/顯示管理者專區介面
@@ -99,14 +109,36 @@ window.closeModal = function() {
     document.getElementById('customModal').classList.add('hidden');
 }
 
-// 1. 即時監聽 Firestore 的廣播資料
+// 1. 即時監聽 Firestore 的廣播資料（含自動彈出通知機制）
+let lastBroadcastId = null;
+
 function listenBroadcasts() {
     const q = query(collection(db, "broadcasts"), orderBy("timestamp", "desc"));
     onSnapshot(q, (snapshot) => {
         let broadcasts = [];
+        let newestDocId = null;
+        let newestData = null;
+
         snapshot.forEach((doc) => {
+            if (!newestDocId) {
+                newestDocId = doc.id;
+                newestData = doc.data();
+            }
             broadcasts.push(doc.data());
         });
+
+        // 偵測到全新廣播時自動彈窗
+        if (newestDocId && lastBroadcastId === null) {
+            lastBroadcastId = newestDocId;
+        } else if (newestDocId && newestDocId !== lastBroadcastId) {
+            lastBroadcastId = newestDocId;
+            
+            const targetDept = newestData.target || '全體同仁';
+            const alertTitle = `[新廣播通知] ${newestData.title}`;
+            const alertBody = `發布對象：${targetDept}\n等級：${newestData.level.toUpperCase()}\n\n${newestData.content}`;
+            
+            showModal(alertTitle, alertBody);
+        }
 
         if (broadcasts.length === 0) {
             broadcasts.push({
@@ -438,7 +470,7 @@ window.sendBroadcastMessage = async function() {
     }
 }
 
-// RDP 相關功能（全體同仁皆可連線與下載 rdp 檔）
+// RDP 相關功能
 window.openWebRdp = function(name, ip) {
     showModal(`啟動網頁遠端桌面: ${name}`, `正在透過 HTML5 Gateway 建立與主機 ${ip} 的加密連線工作階段...\n\n(模擬畫面：已成功掛載遠端桌面串流到瀏覽器視窗)`);
 }
