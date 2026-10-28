@@ -130,19 +130,22 @@
             <!-- Welcome Banner -->
             <div class="bg-gradient-to-r from-corporate-900 to-corporate-700 rounded-2xl p-6 md:p-8 text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div class="space-y-2">
-                    <span class="bg-corporate-600/60 border border-corporate-500/50 text-corporate-100 text-xs px-3 py-1 rounded-full uppercase tracking-wider font-semibold">
-                    </span>
                     <h2 class="text-2xl md:text-3xl font-bold tracking-tight">歡迎使用DGI資訊管理平台</h2>
                     <p class="text-corporate-100/80 text-sm max-w-2xl">
                         公司廣播派發、虛擬工作站遠端桌面與安全公用資料下載通道、自動化安裝部署（如 topdgi.xml）與即時背景通知。
                     </p>
                 </div>
                 <div class="flex flex-wrap gap-3">
-                       <!-- AnyDesk官方諮詢捷徑 -->
-                    <a href="https://anydesk.com/en/downloads/thank-you?dv=win_exe" target="_blank" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
-                        <i class="fa-brands fa-line text-lg"></i> AnyDesk 官方諮詢
+                    <button onclick="switchTab('broadcast')" class="bg-white text-corporate-900 hover:bg-slate-100 font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-corporate-600"></i> 查看廣播
+                    </button>
+                    <button onclick="switchTab('files')" class="bg-corporate-600 hover:bg-corporate-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> 下載安裝包
+                    </button>
+                    <!-- AnyDesk 官方下載捷徑 -->
+                    <a href="https://anydesk.com/en/downloads/thank-you?dv=win_exe" target="_blank" class="bg-rose-600 hover:bg-rose-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-desktop text-lg"></i> AnyDesk 下載
                     </a>
-                    
                     <!-- LINE 官方諮詢捷徑 -->
                     <a href="https://line.me/zh-hant/" target="_blank" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2.5 rounded-xl text-sm shadow transition flex items-center gap-2">
                         <i class="fa-brands fa-line text-lg"></i> LINE 官方諮詢
@@ -484,6 +487,9 @@
             <div>© 2026 公司資訊室 Intranet Hub Systems. All Rights Reserved.</div>
             <div class="flex items-center space-x-4">
                 <span>資安分機：#8888</span>
+                <a href="https://anydesk.com/en/downloads/thank-you?dv=win_exe" target="_blank" class="text-rose-600 hover:underline flex items-center gap-1 font-medium">
+                    <i class="fa-solid fa-desktop"></i> AnyDesk 下載
+                </a>
                 <a href="https://line.me/zh-hant/" target="_blank" class="text-emerald-600 hover:underline flex items-center gap-1 font-medium">
                     <i class="fa-brands fa-line"></i> LINE 官方諮詢
                 </a>
