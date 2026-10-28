@@ -16,8 +16,49 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// 全域儲存檔案與遠端主機對應表
+// 全域儲存變數
 let globalFilesMap = {};
+
+// ==========================================
+// 🔐 權限控制設定：預設當前使用者帳號
+// ==========================================
+// 如果你想模擬一般同仁，可改為 "User"；若為管理者請保持 "Lyon"
+let currentUser = "Lyon"; 
+
+// 檢查是否為管理者的函式
+function checkIsAdmin() {
+    return currentUser.toLowerCase() === "lyon";
+}
+
+// 提供網頁端隨時切換身份測試的函式 (例如在主控台輸入 switchUser('User'))
+window.switchUserRole = function(username) {
+    currentUser = username;
+    applyRolePermissions();
+    showModal('身份切換成功', `目前已切換身份為：${username} (${checkIsAdmin() ? '系統管理者' : '一般同仁'})`);
+}
+
+// 根據權限動態隱藏/顯示管理者專區介面
+function applyRolePermissions() {
+    const isAdmin = checkIsAdmin();
+    
+    // 1. 廣播發布表單區塊
+    const broadcastForm = document.getElementById('adminBroadcastSection');
+    if (broadcastForm) {
+        broadcastForm.style.display = isAdmin ? 'block' : 'none';
+    }
+
+    // 2. 遠端主機「新增終端設備」按鈕
+    const addRdpBtn = document.getElementById('addWorkstationBtn');
+    if (addRdpBtn) {
+        addRdpBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+
+    // 3. 檔案上傳專區
+    const uploadSection = document.getElementById('adminUploadSection');
+    if (uploadSection) {
+        uploadSection.style.display = isAdmin ? 'block' : 'none';
+    }
+}
 
 // Tab Switching Logic
 window.switchTab = function(tabId) {
@@ -134,7 +175,7 @@ function listenFiles() {
         if (sharedFiles.length === 0) {
             globalFilesMap["default_xml"] = {
                 name: "topdgi.xml",
-                fileData: "data:text/xml;base64,PD94bWwgdmVyc2lvbj0nMS4wJz8+PHNldHRpbmdzPjwvY29uZmlnPjwvc2V0dGluZ3M="
+                fileData: "data:text/xml;base64,PD94bWwgdmVyc2lvbj0nMSw0Jz8+PHNldHRpbmdzPjwvY29uZmlnPjwvc2V0dGluZ3M="
             };
             sharedFiles.push({
                 id: "default_xml",
@@ -182,7 +223,6 @@ function listenWorkstations() {
             stations.push(doc.data());
         });
 
-        // 如果資料庫是空的，給予預設的主機
         if (stations.length === 0) {
             stations.push(
                 { name: "RD-Gateway-01 (財務專用)", idCode: "RDP-01", spec: "8 vCPU / 32GB RAM / Windows Server 2022", ip: "192.168.10.50", status: "運行中", statusColor: "emerald" },
@@ -223,8 +263,13 @@ function listenWorkstations() {
     });
 }
 
-// 4. 管理者動態新增遠端桌面主機到 Firestore 雲端
+// 4. 管理者動態新增遠端桌面主機
 window.handleAddWorkstation = async function() {
+    if (!checkIsAdmin()) {
+        showModal('權限不足', '您目前為一般同仁身份，無權新增終端設備。');
+        return;
+    }
+
     const name = prompt("請輸入遠端主機名稱與部門（例如：RD-Gateway-04 (品管專用)）：");
     if (!name) return;
     const ip = prompt("請輸入主機 IP 位址（例如：192.168.10.53）：");
@@ -242,7 +287,7 @@ window.handleAddWorkstation = async function() {
             timestamp: serverTimestamp()
         });
 
-        showModal('新增成功', `已成功將主機「${name} (${ip})」新增至雲端，全體同仁畫面已即時同步！`);
+        showModal('新增成功', `已成功將主機「${name} (${ip})」新增至雲端！`);
     } catch (err) {
         console.error("新增主機失敗: ", err);
         showModal('新增失敗', '無法寫入雲端資料庫。');
@@ -251,6 +296,11 @@ window.handleAddWorkstation = async function() {
 
 // 5. 管理者上傳檔案
 window.handleAdminUpload = async function() {
+    if (!checkIsAdmin()) {
+        showModal('權限不足', '您目前為一般同仁身份，無權上傳檔案。');
+        return;
+    }
+
     const fileInput = document.getElementById('adminUploadFile');
     const categorySelect = document.getElementById('adminFileCategory');
 
@@ -298,7 +348,7 @@ window.handleAdminUpload = async function() {
     reader.readAsDataURL(file);
 }
 
-// 6. 下載檔案
+// 6. 下載檔案（全體同仁皆可使用）
 window.downloadCloudFile = function(fileId) {
     const fileRecord = globalFilesMap[fileId];
     if (!fileRecord || !fileRecord.fileData) {
@@ -329,15 +379,20 @@ window.downloadCloudFile = function(fileId) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        showModal('檔案下載成功', `已成功從雲端下載檔案：${fileName}`);
+        showModal('檔案下載成功', `已成功下載檔案：${fileName}`);
     } catch (e) {
         console.error("下載失敗: ", e);
         showModal('下載失敗', '檔案解碼過程發生錯誤。');
     }
 }
 
-// 發布廣播
+// 發布廣播（僅限管理者 Lyon）
 window.sendBroadcastMessage = async function() {
+    if (!checkIsAdmin()) {
+        showModal('權限不足', '您目前為一般同仁身份，無權發布廣播。');
+        return;
+    }
+
     const titleInput = document.getElementById('broadcastTitleInput');
     const targetSelect = document.getElementById('broadcastTargetSelect');
     const levelSelect = document.getElementById('broadcastLevelSelect');
@@ -373,7 +428,7 @@ window.sendBroadcastMessage = async function() {
     }
 }
 
-// RDP 相關模擬功能
+// RDP 相關功能（全體同仁皆可連線與下載 rdp 檔）
 window.openWebRdp = function(name, ip) {
     showModal(`啟動網頁遠端桌面: ${name}`, `正在透過 HTML5 Gateway 建立與主機 ${ip} 的加密連線工作階段...\n\n(模擬畫面：已成功掛載遠端桌面串流到瀏覽器視窗)`);
 }
@@ -401,9 +456,10 @@ window.triggerFileDownload = function(fileName, category) {
     showModal('安全下載通知', `您正在下載：「${fileName}」\n分類：${category}`);
 }
 
-// 網頁載入完成後啟動所有監聽
+// 網頁載入完成後啟動所有監聽與權限套用
 window.onload = function() {
     listenBroadcasts();
     listenFiles();
     listenWorkstations();
+    applyRolePermissions(); // 套用權限：若非 Lyon 則隱藏管理者操作區
 };
