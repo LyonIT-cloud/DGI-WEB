@@ -1,0 +1,13 @@
+/* 自訂企業色彩與共用微調樣式 */
+:root {
+    --corporate-50: #f0f6ff;
+    --corporate-100: #e0eefd;
+    --corporate-500: #0284c7;
+    --corporate-600: #026aa7;
+    --corporate-700: #035388;
+    --corporate-900: #0f2942;
+}
+
+body {
+    font-family: 'Inter', 'Microsoft JhengHei', sans-serif;
+}
