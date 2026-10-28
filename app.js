@@ -16,6 +16,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// 全域儲存目前的檔案清單，供下載使用
+let globalFilesMap = {};
+
 // Tab Switching Logic
 window.switchTab = function(tabId) {
     const tabs = ['dashboard', 'broadcast', 'rdp', 'files'];
@@ -115,23 +118,32 @@ function listenBroadcasts() {
     });
 }
 
-// 2. 即時監聽 Firestore 的共用檔案清單（雲端檔案櫃）
+// 2. 即時監聽 Firestore 的共用檔案清單（安全對應表下載法）
 function listenFiles() {
     const q = query(collection(db, "sharedFiles"), orderBy("timestamp", "desc"));
     onSnapshot(q, (snapshot) => {
         let sharedFiles = [];
+        globalFilesMap = {}; // 清空並重新對應
+
         snapshot.forEach((doc) => {
-            sharedFiles.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            const fileId = doc.id;
+            globalFilesMap[fileId] = data; // 存入記憶體中，避免 HTML 傳遞過長字串出錯
+            sharedFiles.push({ id: fileId, ...data });
         });
 
         if (sharedFiles.length === 0) {
+            globalFilesMap["default_xml"] = {
+                name: "topdgi.xml",
+                fileData: "data:text/xml;base64,PD94bWwgdmVyc2lvbj0nMS4wJz8+PHNldHRpbmdzPjwvY29uZmlnPjwvc2V0dGluZ3M+"
+            };
             sharedFiles.push({
+                id: "default_xml",
                 name: "topdgi.xml",
                 category: "系統部署",
                 size: "4.2 KB",
                 date: "2026-10-28",
-                icon: "fa-file-code text-indigo-600",
-                fileData: ""
+                icon: "fa-file-code text-indigo-600"
             });
         }
 
@@ -147,7 +159,7 @@ function listenFiles() {
                     <td class="py-3.5 px-6 text-slate-500 text-xs">${f.size}</td>
                     <td class="py-3.5 px-6 text-slate-500 text-xs">${f.date}</td>
                     <td class="py-3.5 px-6 text-right">
-                        <button onclick='downloadCloudFile(\`${encodeURIComponent(f.name)}\`, \`${f.fileData || ''}\`)' class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
+                        <button onclick="downloadCloudFile('${f.id}')" class="px-3 py-1.5 bg-corporate-600 hover:bg-corporate-700 text-white rounded-lg text-xs font-medium transition shadow-sm">
                             <i class="fa-solid fa-download mr-1"></i> 下載
                         </button>
                     </td>
@@ -162,7 +174,7 @@ function listenFiles() {
     });
 }
 
-// 3. 管理者上傳檔案到 Firestore 雲端（支援 Excel 等二進位檔案轉 Base64）
+// 3. 管理者上傳檔案到 Firestore 雲端
 window.handleAdminUpload = async function() {
     const fileInput = document.getElementById('adminUploadFile');
     const categorySelect = document.getElementById('adminFileCategory');
@@ -174,7 +186,6 @@ window.handleAdminUpload = async function() {
 
     const file = fileInput.files[0];
     
-    // 限制 1MB 以內的輕量檔案
     if (file.size > 1024 * 1024) {
         showModal('檔案過大', '此上傳通道專為 1MB 以下的輕量檔案設計。');
         return;
@@ -182,7 +193,7 @@ window.handleAdminUpload = async function() {
 
     const reader = new FileReader();
     reader.onload = async function(e) {
-        const base64String = e.target.result; // 轉為 Base64 字串，完美支援 Excel
+        const base64String = e.target.result; 
         const now = new Date();
         const dateStr = now.getFullYear() + '-' + (now.getMonth()+1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
         
@@ -213,20 +224,20 @@ window.handleAdminUpload = async function() {
     reader.readAsDataURL(file);
 }
 
-// 4. 同仁點擊下載雲端檔案（完整支援 Base64 還原下載）
-window.downloadCloudFile = function(encodedName, base64Data) {
-    const fileName = decodeURIComponent(encodedName);
+// 4. 透過 ID 安全觸發下載
+window.downloadCloudFile = function(fileId) {
+    const fileRecord = globalFilesMap[fileId];
+    if (!fileRecord || !fileRecord.fileData) {
+        showModal('下載失敗', '找不到該檔案的雲端資料內容。');
+        return;
+    }
 
     try {
-        // 如果沒有資料內容的防護
-        if (!base64Data) {
-            showModal('下載提示', `檔案 ${fileName} 內容為空或為預設項目。`);
-            return;
-        }
+        const base64Data = fileRecord.fileData;
+        const fileName = fileRecord.name;
 
-        // 將 Base64 還原為二進位檔案
         const arr = base64Data.split(',');
-        const mime = arr[0].match(/:(.*?);/)[1];
+        const mime = arr[0].match(/:(.*?);/)[1] || 'application/octet-stream';
         const bstr = atob(arr[1]);
         let n = bstr.length;
         const u8arr = new Uint8Array(n);
@@ -247,7 +258,7 @@ window.downloadCloudFile = function(encodedName, base64Data) {
         showModal('檔案下載成功', `已成功從雲端下載檔案：${fileName}`);
     } catch (e) {
         console.error("下載失敗: ", e);
-        showModal('下載失敗', '檔案解析或下載過程發生錯誤。');
+        showModal('下載失敗', '檔案解碼過程發生錯誤。');
     }
 }
 
